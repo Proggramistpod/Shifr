@@ -2,136 +2,52 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Shifr.WorkFile
 {
     internal class JsonCryption
     {
-
-        private readonly string _appPath;
         private readonly string _historyFile;
         private readonly object _fileLock = new object();
-        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions();
+
+        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        };
 
         public JsonCryption()
         {
-            string myAppPath = Path.Combine(
+            string appPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Shifr"
             );
 
-            Directory.CreateDirectory(myAppPath);
-            _historyFile = Path.Combine(myAppPath, "history.json");
+            Directory.CreateDirectory(appPath);
+            _historyFile = Path.Combine(appPath, "history.json");
+
+            if (!File.Exists(_historyFile))
+                File.WriteAllText(_historyFile, "[]");
         }
 
-        public void AddRecord(IData data)
+        public void AddRecord(DataRecord record)
         {
-            try
-            {
-                List<IData> history = new List<IData>();
-                if (File.Exists(_historyFile))
-                {
-                    string json = File.ReadAllText(_historyFile);
-                    history = JsonSerializer.Deserialize<List<IData>>(json) ?? new List<IData>();
-                }
-
-                history.Add(data);
-                string jsonData = JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_historyFile, jsonData);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Ошибка при добавлении записи: {ex.Message}");
-            }
-        }
-
-        public List<IData> GetRecords()
-        {
-            try
-            {
-                if (!File.Exists(_historyFile))
-                    return new List<IData>();
-
-                string json = File.ReadAllText(_historyFile);
-                return JsonSerializer.Deserialize<List<IData>>(json) ?? new List<IData>();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Ошибка при чтении истории: {ex.Message}");
-            }
-        }
-
-        public bool UpdateEncryptionStatus(string filePathOrFileName, bool isEncrypted)
-        {
-            if (string.IsNullOrWhiteSpace(filePathOrFileName))
-                return false;
-
             lock (_fileLock)
             {
                 var history = ReadHistoryInternal();
-                if (history.Count == 0) return false;
-
-                // Нормализуем вход
-                string inputFull = null;
-                try
-                {
-                    if (Path.IsPathRooted(filePathOrFileName))
-                        inputFull = Path.GetFullPath(filePathOrFileName);
-                }
-                catch { inputFull = null; }
-
-                string inputFileName = Path.GetFileName(filePathOrFileName);
-                string inputFileNoEnc = inputFileName;
-                if (!string.IsNullOrEmpty(inputFileNoEnc) && inputFileNoEnc.EndsWith(".enc", StringComparison.OrdinalIgnoreCase))
-                    inputFileNoEnc = inputFileNoEnc.Substring(0, inputFileNoEnc.Length - 4);
-                string inputFileWithEnc = inputFileName.EndsWith(".enc", StringComparison.OrdinalIgnoreCase) ? inputFileName : inputFileName + ".enc";
-
-                var matches = new List<IData>();
-
-                // 1) По полному пути
-                if (!string.IsNullOrEmpty(inputFull))
-                {
-                    foreach (var r in history)
-                    {
-                        try
-                        {
-                            if (string.IsNullOrEmpty(r.File)) continue;
-                            string recFull = Path.GetFullPath(Path.Combine(r.Path ?? "", r.File));
-                            if (string.Equals(recFull, inputFull, StringComparison.OrdinalIgnoreCase))
-                            {
-                                matches.Add(r);
-                            }
-                        }
-                        catch { /* игнорируем */ }
-                    }
-                }
-
-                // 2) По имени файла (и вариантах с/без .enc)
-                if (matches.Count == 0 && !string.IsNullOrEmpty(inputFileName))
-                {
-                    matches = history.Where(r =>
-                    {
-                        if (string.IsNullOrEmpty(r.File)) return false;
-                        var rf = r.File;
-                        if (string.Equals(rf, inputFileName, StringComparison.OrdinalIgnoreCase)) return true;
-                        if (string.Equals(rf, inputFileNoEnc, StringComparison.OrdinalIgnoreCase)) return true;
-                        if (string.Equals(rf, inputFileWithEnc, StringComparison.OrdinalIgnoreCase)) return true;
-                        return false;
-                    }).ToList();
-                }
-
-                if (matches.Count == 0) return false;
-
-                foreach (var m in matches)
-                {
-                    m.IsEncryption = isEncrypted;
-                    m.Date = DateTime.Now;
-                }
-
+                history.Add(record);
                 WriteHistoryInternal(history);
-                return true;
+            }
+        }
+
+        public List<DataRecord> GetRecords()
+        {
+            lock (_fileLock)
+            {
+                return ReadHistoryInternal();
             }
         }
 
@@ -139,27 +55,33 @@ namespace Shifr.WorkFile
         {
             lock (_fileLock)
             {
-                if (File.Exists(_historyFile)) File.Delete(_historyFile);
+                if (File.Exists(_historyFile))
+                    File.WriteAllText(_historyFile, "[]");
             }
         }
 
-        #region IO helpers
-        private List<IData> ReadHistoryInternal()
+        private List<DataRecord> ReadHistoryInternal()
         {
             try
             {
-                if (!File.Exists(_historyFile)) return new List<IData>();
+                if (!File.Exists(_historyFile))
+                    return new List<DataRecord>();
+
                 string json = File.ReadAllText(_historyFile);
-                var list = JsonSerializer.Deserialize<List<IData>>(json, _jsonOptions);
-                return list ?? new List<IData>();
+                if (string.IsNullOrWhiteSpace(json))
+                    return new List<DataRecord>();
+
+                var list = JsonSerializer.Deserialize<List<DataRecord>>(json, _jsonOptions);
+                return list ?? new List<DataRecord>();
             }
             catch (Exception ex)
             {
-                throw new Exception($"Ошибка чтения history.json: {ex.Message}", ex);
+                File.AppendAllText("error_log.txt", $"[{DateTime.Now}] Read error: {ex}\n");
+                return new List<DataRecord>();
             }
         }
 
-        private void WriteHistoryInternal(List<IData> history)
+        private void WriteHistoryInternal(List<DataRecord> history)
         {
             try
             {
@@ -168,11 +90,8 @@ namespace Shifr.WorkFile
             }
             catch (Exception ex)
             {
-                throw new Exception($"Ошибка записи history.json: {ex.Message}", ex);
+                File.AppendAllText("error_log.txt", $"[{DateTime.Now}] Write error: {ex}\n");
             }
         }
-        #endregion
     }
 }
-
-

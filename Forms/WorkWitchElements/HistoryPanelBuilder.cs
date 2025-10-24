@@ -4,6 +4,7 @@ using Shifr.WorkFile.Data;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,7 +15,7 @@ namespace Shifr.Forms.WorkWitchElements
     internal class HistoryPanelBuilder
     {
         private FlowLayoutPanel _container;
-        private  ShifrClient _client;
+        private ShifrClient _client;
         private PasswordForm _form;
         public HistoryPanelBuilder(FlowLayoutPanel container, ShifrClient client)
         {
@@ -25,10 +26,25 @@ namespace Shifr.Forms.WorkWitchElements
         {
             _container.Controls.Clear();
 
-            var history = _client.GetOperationHistory()
-                .Where(r => r.IsEncryption)
+            var allHistory = _client.GetOperationHistory()
                 .OrderByDescending(r => r.Date)
                 .ToList();
+
+            var history = new List<DataRecord>();
+
+            foreach (var group in allHistory.GroupBy(r => Path.Combine(r.Path, r.File)))
+            {
+                var operations = group.OrderByDescending(r => r.Date).ToList();
+                var lastOp = operations.First();
+
+                if (lastOp.IsEncryption)
+                {
+                    history.AddRange(operations); // добавляем все операции этого файла
+                }
+            }
+
+            // Итоговый список history уже содержит все операции, кроме файлов, которые последней операцией были расшифрованы
+            history = history.OrderByDescending(r => r.Date).ToList();
 
             if (history.Count == 0)
             {
@@ -49,7 +65,7 @@ namespace Shifr.Forms.WorkWitchElements
             }
         }
 
-        private Panel CreateHistoryPanel(IData record)
+        private Panel CreateHistoryPanel(DataRecord record)
         {
             Panel panel = new Panel
             {
@@ -87,7 +103,18 @@ namespace Shifr.Forms.WorkWitchElements
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = Color.LightYellow
             };
-
+            Button openFileButton = new Button
+            {
+                Size = new Size(32, 32),
+                Location = new Point(panel.Width - 90, (panel.Height - 32) / 2),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.Black,
+                BackgroundImage = Properties.Resources.OpenFile,
+                BackgroundImageLayout = ImageLayout.Zoom,
+                Tag = record
+            };
+            openFileButton.FlatAppearance.BorderSize = 0;
+            openFileButton.Click += (s, e) => OpenFileClick(record);
             Button decryptButton = new Button
             {
                 Size = new Size(32, 32),
@@ -113,17 +140,20 @@ namespace Shifr.Forms.WorkWitchElements
             panel.Controls.Add(fileLabel);
             panel.Controls.Add(dateLabel);
             panel.Controls.Add(decryptButton);
+            panel.Controls.Add(openFileButton);
 
             panel.Resize += (s, e) => decryptButton.Left = panel.Width - 45;
 
             return panel;
         }
-        private void DescryptionClick(IData record)
+        private void DescryptionClick(DataRecord record)
         {
             if (_form == null || _form.IsDisposed)
             {
                 _form = new PasswordForm();
                 CryotionData.Path = record.Path + "\\" + record.File;
+                CryotionData.cipherType = record.CipherType;
+                CryotionData.Key = record.Key;
                 _form.Show();
             }
             else
@@ -131,5 +161,29 @@ namespace Shifr.Forms.WorkWitchElements
                 _form.Focus();
             }
         }
+        private void OpenFileClick(DataRecord record)
+        {
+            string fullPath = Path.Combine(record.Path, record.File);
+
+            if (!File.Exists(fullPath))
+            {
+                MessageBox.Show("Файл не найден", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = fullPath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не удалось открыть файл: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
     }
 }
+

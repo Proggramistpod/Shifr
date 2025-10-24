@@ -34,6 +34,7 @@
             this.ButtonBrown = new System.Windows.Forms.Button();
             this.textBoxPath = new System.Windows.Forms.TextBox();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+            this.comboBox1 = new System.Windows.Forms.ComboBox();
             this.label1 = new System.Windows.Forms.Label();
             this.textBoxPassword = new System.Windows.Forms.TextBox();
             this.treeViewExploler = new System.Windows.Forms.TreeView();
@@ -84,17 +85,36 @@
             // 
             // splitContainer1.Panel1
             // 
+            this.splitContainer1.Panel1.Controls.Add(this.comboBox1);
             this.splitContainer1.Panel1.Controls.Add(this.label1);
             this.splitContainer1.Panel1.Controls.Add(this.textBoxPassword);
             this.splitContainer1.Panel1.Controls.Add(this.ButtonBrown);
             this.splitContainer1.Panel1.Controls.Add(this.textBoxPath);
+            this.splitContainer1.Panel1.Paint += new System.Windows.Forms.PaintEventHandler(this.splitContainer1_Panel1_Paint);
             // 
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.treeViewExploler);
-            this.splitContainer1.Size = new System.Drawing.Size(524, 429);
-            this.splitContainer1.SplitterDistance = 70;
+            this.splitContainer1.Size = new System.Drawing.Size(846, 546);
+            this.splitContainer1.SplitterDistance = 108;
             this.splitContainer1.TabIndex = 4;
+            // 
+            // comboBox1
+            // 
+            this.comboBox1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
+            this.comboBox1.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.comboBox1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.comboBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F);
+            this.comboBox1.ForeColor = System.Drawing.Color.Yellow;
+            this.comboBox1.FormattingEnabled = true;
+            this.comboBox1.Items.AddRange(new object[] {
+            "Цезарь",
+            "Виженер",
+            "Плейфер"});
+            this.comboBox1.Location = new System.Drawing.Point(12, 67);
+            this.comboBox1.Name = "comboBox1";
+            this.comboBox1.Size = new System.Drawing.Size(211, 28);
+            this.comboBox1.TabIndex = 6;
             // 
             // label1
             // 
@@ -127,7 +147,7 @@
             this.treeViewExploler.ForeColor = System.Drawing.Color.Yellow;
             this.treeViewExploler.Location = new System.Drawing.Point(0, 0);
             this.treeViewExploler.Name = "treeViewExploler";
-            this.treeViewExploler.Size = new System.Drawing.Size(524, 355);
+            this.treeViewExploler.Size = new System.Drawing.Size(846, 434);
             this.treeViewExploler.TabIndex = 0;
             this.treeViewExploler.BeforeExpand += new System.Windows.Forms.TreeViewCancelEventHandler(this.treeViewExploler_BeforeExpand);
             this.treeViewExploler.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.treeViewExploler_AfterSelect);
@@ -137,7 +157,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.Black;
-            this.ClientSize = new System.Drawing.Size(524, 429);
+            this.ClientSize = new System.Drawing.Size(846, 546);
             this.Controls.Add(this.splitContainer1);
             this.Name = "CriptionForm";
             this.Text = "Cription";
@@ -160,5 +180,6 @@
         private System.Windows.Forms.TreeView treeViewExploler;
         private System.Windows.Forms.TextBox textBoxPassword;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.ComboBox comboBox1;
     }
 }

@@ -1,78 +1,128 @@
-﻿using Shifr.Modul.Data;
-using Shifr.WorkFile.Data;
+﻿using Shifr.WorkFile.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Shifr.WorkFile
 {
+    public enum CipherType
+    {
+        Caesar,
+        Vigenere,
+        Playfair
+    }
+
     internal class ShifrClient
     {
         private readonly JsonCryption _jsonManager;
-        private readonly FileEncryptor _fileEncryptor;
+        private readonly FileEncryptor _textCryption;
 
         public ShifrClient()
         {
             _jsonManager = new JsonCryption();
-            _fileEncryptor = new FileEncryptor();
+            _textCryption = new FileEncryptor();
         }
 
-        public void EncryptFile(string filePath, string password)
+        public void EncryptFile(string filePath, string key, CipherType algorithm)
         {
-            _fileEncryptor.EncryptFile(filePath, password);
-            LogOperation(filePath, true);
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"Файл не найден: {filePath}");
+
+            string extension = Path.GetExtension(filePath).ToLower();
+            string[] textExtensions = {
+                ".txt", ".csv", ".xml", ".json", ".log", ".ini", ".config",
+                ".html", ".htm", ".css", ".js", ".sql", ".md", ".rtf",
+                ".bat", ".ps1", ".py", ".java", ".cpp", ".c", ".h", ".cs",
+                ".php", ".rb", ".pl", ".sh", ".yaml", ".yml", ".properties",
+                ".doc", ".docx"
+            };
+
+            if (!textExtensions.Contains(extension))
+                throw new InvalidOperationException("Можно шифровать только текстовые файлы.");
+
+            string content;
+            if (extension == ".doc" || extension == ".docx")
+                content = WordHelper.ReadWordText(filePath);
+            else
+                content = File.ReadAllText(filePath);
+
+            string encrypted = _textCryption.ProcessText(content, algorithm, true, key);
+
+            if (extension == ".doc" || extension == ".docx")
+                WordHelper.WriteWordText(filePath, encrypted);
+            else
+                File.WriteAllText(filePath, encrypted);
+
+            LogOperation(filePath, true, algorithm, key);
         }
 
-        public bool DecryptFile(string encryptedFileFullPath, string password)
+        public void DecryptFile(string filePath, string key, CipherType algorithm)
         {
-            if (string.IsNullOrWhiteSpace(encryptedFileFullPath))
-                throw new ArgumentNullException(nameof(encryptedFileFullPath));
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"Файл не найден: {filePath}");
 
-            // Нормализуем путь
-            string full = encryptedFileFullPath;
-            try { full = Path.GetFullPath(encryptedFileFullPath); } catch { }
-            if (!File.Exists(full) && File.Exists(full + ".enc"))
-                full = full + ".enc";
+            string extension = Path.GetExtension(filePath).ToLower();
+            string[] textExtensions = {
+                ".txt", ".csv", ".xml", ".json", ".log", ".ini", ".config",
+                ".html", ".htm", ".css", ".js", ".sql", ".md", ".rtf",
+                ".bat", ".ps1", ".py", ".java", ".cpp", ".c", ".h", ".cs",
+                ".php", ".rb", ".pl", ".sh", ".yaml", ".yml", ".properties",
+                ".doc", ".docx"
+            };
+            if (!textExtensions.Contains(extension))
+                throw new InvalidOperationException("Можно дешифровать только текстовые файлы.");
 
-            // Если файл не существует — выбросим
-            if (!File.Exists(full))
-                throw new FileNotFoundException("Файл для дешифровки не найден: " + full);
+            string encrypted = File.ReadAllText(filePath);
+            string decrypted = _textCryption.ProcessText(encrypted, algorithm, false, key);
+            File.WriteAllText(filePath, decrypted);
 
-            // Дешифруем
-            _fileEncryptor.DecryptFile(full, password);
-
-            // Обновляем статус в истории — первым аргументом передаём полный путь к зашифрованному файлу
-            bool updated = _jsonManager.UpdateEncryptionStatus(full, false);
-
-            // Если не нашлось по полному пути — как запасной вариант пробуем по имени
-            if (!updated)
-                updated = _jsonManager.UpdateEncryptionStatus(Path.GetFileName(full), false);
-
-            return true;
+            LogOperation(filePath, false, algorithm, key);
         }
 
-        private void LogOperation(string targetPath, bool isEncrypt)
+        public string ProcessText(string text, CipherType type, bool isEncrypt, string key, string filePath = null)
         {
-            var record = new IData(
-                System.IO.Path.GetDirectoryName(targetPath),
-                System.IO.Path.GetFileName(targetPath),
-                DateTime.Now
-            )
+            if (string.IsNullOrWhiteSpace(text))
+                throw new ArgumentException("Текст не может быть пустым.");
+
+            string result = _textCryption.ProcessText(text, type, isEncrypt, key);
+
+            if (!string.IsNullOrEmpty(filePath))
+                LogOperation(filePath, isEncrypt, type, key);
+
+            return result;
+        }
+
+        public List<DataRecord> GetOperationHistory()
+        {
+            var allRecords = _jsonManager.GetRecords();
+            return allRecords.OrderByDescending(r => r.Date).ToList();
+        }
+
+        public List<DataRecord> GetFileHistory(string filePath)
+        {
+            var allRecords = _jsonManager.GetRecords();
+            return allRecords
+                .Where(r => r.File == Path.GetFileName(filePath) || r.Path == Path.GetDirectoryName(filePath))
+                .OrderByDescending(r => r.Date)
+                .ToList();
+        }
+
+        public void ClearHistory() => _jsonManager.ClearHistory();
+
+        private void LogOperation(string filePath, bool isEncrypt, CipherType cipherType, string key)
+        {
+            var record = new DataRecord
             {
+                Path = Path.GetDirectoryName(filePath),
+                File = Path.GetFileName(filePath),
+                Date = DateTime.Now,
+                CipherType = cipherType,
+                Key = key,
                 IsEncryption = isEncrypt
             };
 
             _jsonManager.AddRecord(record);
         }
-
-        public List<IData> GetOperationHistory()
-        {
-            var allRecords = _jsonManager.GetRecords();
-            return allRecords.Where(r => r.IsEncryption).ToList();
-        }
     }
 }
-
