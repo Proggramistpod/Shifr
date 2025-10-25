@@ -32,15 +32,19 @@ namespace Shifr
             if (cr == null || cr.IsDisposed)
             {
                 cr = new CriptionForm();
+                cr.UpdateMenu += UpdateData;
                 cr.Show();
             }
             else
             {
                 cr.Focus(); 
             }
-            hs.LoadHistory();
         }
         private void UpdateButton_Click(object sender, EventArgs e)
+        {
+            UpdateData();
+        }
+        private void UpdateData()
         {
             hs.LoadHistory();
         }

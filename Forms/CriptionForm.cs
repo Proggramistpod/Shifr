@@ -12,7 +12,7 @@ namespace Shifr.Forms
     {
         private ShifrClient shifrClient = new ShifrClient();
         private FileSystemTreeBuilder treeBuilder = new FileSystemTreeBuilder();
-
+        public event Action UpdateMenu;
         public CriptionForm()
         {
             InitializeComponent();
@@ -63,14 +63,13 @@ namespace Shifr.Forms
 
             try
             {
-                // Проверяем, что файл текстовый по расширению
                 string extension = Path.GetExtension(originalPath).ToLower();
                 string[] textExtensions = {
-            ".txt", ".csv", ".xml", ".json", ".log", ".ini", ".config",
-            ".html", ".htm", ".css", ".js", ".sql", ".md", ".rtf",
-            ".bat", ".ps1", ".py", ".java", ".cpp", ".c", ".h", ".cs",
-            ".php", ".rb", ".pl", ".sh", ".yaml", ".yml", ".properties"
-        };
+                    ".docx", ".doc", ".txt", ".csv", ".xml", ".json", ".log", ".ini", ".config",
+                    ".html", ".htm", ".css", ".js", ".sql", ".md", ".rtf",
+                    ".bat", ".ps1", ".py", ".java", ".cpp", ".c", ".h", ".cs",
+                    ".php", ".rb", ".pl", ".sh", ".yaml", ".yml", ".properties"
+                };
 
                 if (!textExtensions.Contains(extension))
                 {
@@ -91,8 +90,6 @@ namespace Shifr.Forms
                                             textBoxPassword.Text,
                                             originalPath 
                                             );
-
-                // Перезаписываем файл зашифрованным содержимым
                 File.WriteAllText(originalPath, encryptedContent);
 
                 TreeNode node = FindTreeNodeByPath(originalPath);
@@ -100,7 +97,7 @@ namespace Shifr.Forms
                 {
                     RefreshNode(node.Parent);
                 }
-
+                UpdateMenu?.Invoke();
                 MessageBox.Show("Текстовый файл успешно зашифрован", "ПРОЦЕСС", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)

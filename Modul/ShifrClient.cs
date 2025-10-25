@@ -24,61 +24,6 @@ namespace Shifr.WorkFile
             _textCryption = new FileEncryptor();
         }
 
-        public void EncryptFile(string filePath, string key, CipherType algorithm)
-        {
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException($"Файл не найден: {filePath}");
-
-            string extension = Path.GetExtension(filePath).ToLower();
-            string[] textExtensions = {
-                ".txt", ".csv", ".xml", ".json", ".log", ".ini", ".config",
-                ".html", ".htm", ".css", ".js", ".sql", ".md", ".rtf",
-                ".bat", ".ps1", ".py", ".java", ".cpp", ".c", ".h", ".cs",
-                ".php", ".rb", ".pl", ".sh", ".yaml", ".yml", ".properties",
-                ".doc", ".docx"
-            };
-
-            if (!textExtensions.Contains(extension))
-                throw new InvalidOperationException("Можно шифровать только текстовые файлы.");
-
-            string content;
-            if (extension == ".doc" || extension == ".docx")
-                content = WordHelper.ReadWordText(filePath);
-            else
-                content = File.ReadAllText(filePath);
-
-            string encrypted = _textCryption.ProcessText(content, algorithm, true, key);
-
-            if (extension == ".doc" || extension == ".docx")
-                WordHelper.WriteWordText(filePath, encrypted);
-            else
-                File.WriteAllText(filePath, encrypted);
-
-            LogOperation(filePath, true, algorithm, key);
-        }
-
-        public void DecryptFile(string filePath, string key, CipherType algorithm)
-        {
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException($"Файл не найден: {filePath}");
-
-            string extension = Path.GetExtension(filePath).ToLower();
-            string[] textExtensions = {
-                ".txt", ".csv", ".xml", ".json", ".log", ".ini", ".config",
-                ".html", ".htm", ".css", ".js", ".sql", ".md", ".rtf",
-                ".bat", ".ps1", ".py", ".java", ".cpp", ".c", ".h", ".cs",
-                ".php", ".rb", ".pl", ".sh", ".yaml", ".yml", ".properties",
-                ".doc", ".docx"
-            };
-            if (!textExtensions.Contains(extension))
-                throw new InvalidOperationException("Можно дешифровать только текстовые файлы.");
-
-            string encrypted = File.ReadAllText(filePath);
-            string decrypted = _textCryption.ProcessText(encrypted, algorithm, false, key);
-            File.WriteAllText(filePath, decrypted);
-
-            LogOperation(filePath, false, algorithm, key);
-        }
 
         public string ProcessText(string text, CipherType type, bool isEncrypt, string key, string filePath = null)
         {
